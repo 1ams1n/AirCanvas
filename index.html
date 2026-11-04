@@ -5,7 +5,8 @@
     <title>air canvas</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #f0f0f0; }
-        #board { display: block; background-color: #ffffff; cursor: none; }
+        /* cursor: none을 제거하여 마우스 커서가 보이도록 수정 */
+        #board { display: block; background-color: #ffffff; }
         #videoElement {
             position: absolute;
             bottom: 20px;
@@ -47,6 +48,43 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             line-height: 1.5;
         }
+        /* 버튼 그룹 컨테이너 (우측 상단 정렬) */
+        .top-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+        .btn {
+            font-family: sans-serif;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+        #imageUploadBtn {
+            background: #2196F3;
+        }
+        #imageUploadBtn:hover {
+            background: #0b7dda;
+        }
+        #downloadBtn {
+            background: #4CAF50;
+        }
+        #downloadBtn:hover {
+            background: #45a049;
+        }
+        /* 실제 파일 input은 숨김 처리 */
+        #imageInput {
+            display: none;
+        }
     </style>
     <!-- MediaPipe 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -58,11 +96,19 @@
     <video id="videoElement" autoplay playsinline></video>
     <canvas id="overlay"></canvas>
     <div id="cursor"></div>
+    
+    <!-- 우측 상단 버튼 그룹 -->
+    <div class="top-controls">
+        <input type="file" id="imageInput" accept="image/*">
+        <button id="imageUploadBtn" class="btn">📁 이미지 불러오기</button>
+        <button id="downloadBtn" class="btn">📸 이미지 저장</button>
+    </div>
+
     <div id="instruction">
         <strong>조작 방법:</strong><br>
         - 검지만 펴기: 선 그리기<br>
         - 검지 + 중지 펴기: 그리기 일시정지 (파란 커서)<br>
-        - 주먹 쥐었다 활짝 펴기: 전체 지우기<br>
+        - 주먹 쥐었다 활짝 펴기: 전체 지우기 (낙서만 지워짐)<br>
         - 검지 + 중지 펴고 <strong>왼쪽으로 90도 눕히기</strong>: 한 획 뒤로가기
     </div>
 
@@ -73,6 +119,9 @@
         const overlay = document.getElementById('overlay');
         const overlayCtx = overlay.getContext('2d');
         const cursor = document.getElementById('cursor');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const imageUploadBtn = document.getElementById('imageUploadBtn');
+        const imageInput = document.getElementById('imageInput');
 
         // 캔버스 사이즈 설정
         board.width = window.innerWidth;
@@ -92,13 +141,35 @@
         let wasFist = false;
         let canUndo = true; // 뒤로가기 연속 실행 방지 플래그
 
-        // 초기 화면 설정
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, board.width, board.height);
+        let bgImage = null; // 불러온 배경 이미지 객체
 
-        function redrawBoard() {
+        // 초기 화면 채우기
+        clearBoardCanvas();
+
+        function clearBoardCanvas() {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, board.width, board.height);
+            if (bgImage) {
+                drawBackgroundImage();
+            }
+        }
+
+        // 배경 이미지를 캔버스 중앙에 비율 유지하며 그리기
+        function drawBackgroundImage() {
+            if (!bgImage) return;
+            const hRatio = board.width / bgImage.width;
+            const vRatio = board.height / bgImage.height;
+            const ratio = Math.min(hRatio, vRatio);
+            
+            const centerShiftX = (board.width - bgImage.width * ratio) / 2;
+            const centerShiftY = (board.height - bgImage.height * ratio) / 2;
+            
+            ctx.drawImage(bgImage, 0, 0, bgImage.width, bgImage.height, 
+                          centerShiftX, centerShiftY, bgImage.width * ratio, bgImage.height * ratio);
+        }
+
+        function redrawBoard() {
+            clearBoardCanvas();
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 5;
             ctx.lineCap = 'round';
@@ -128,6 +199,37 @@
                 currentStroke = [];
             }
         }
+
+        // 이미지 불러오기 버튼 클릭 시 파일 선택창 열기
+        imageUploadBtn.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        // 파일 선택 시 이미지 로드
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    bgImage = img;
+                    redrawBoard(); // 배경 적용 후 캔버스 다시 그리기
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+            imageInput.value = ''; // 같은 파일 재선택 가능하도록 초기화
+        });
+
+        // 이미지 다운로드 기능 구현
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'air-canvas-drawing.png';
+            link.href = board.toDataURL('image/png');
+            link.click();
+        });
 
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -205,10 +307,10 @@
                 }
                 if (isOpenPalm) {
                     if (wasFist) {
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, board.width, board.height);
+                        // 배경 이미지는 유지하고 낙서(strokes)만 초기화
                         strokes = [];
                         currentStroke = [];
+                        redrawBoard();
                         wasFist = false;
                     } else {
                         cursor.style.display = 'none';
