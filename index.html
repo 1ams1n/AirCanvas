@@ -215,6 +215,28 @@
             z-index: 10;
             box-shadow: 0 4px 10px rgba(0,0,0,0.25);
         }
+        /* 칠판 하단 분필 받침대 */
+.board-frame::after {
+    content: "";
+    position: absolute;
+    bottom: -13px;
+    left: 8%;
+    width: 84%;
+    height: 13px;
+
+    background: linear-gradient(
+        to bottom,
+        #c18a4e,
+        #855329,
+        #5c381e
+    );
+
+    border-radius: 0 0 5px 5px;
+
+    box-shadow:
+        0 5px 8px rgba(0,0,0,0.4),
+        inset 0 2px 3px rgba(255,255,255,0.2);
+}
     </style>
     <!-- MediaPipe 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -231,7 +253,6 @@
     <canvas id="overlay"></canvas>
     <div id="cursor"></div>
     
-    <!-- 우측 상단 버튼 그룹 -->
     <div class="top-controls">
         <input type="file" id="imageInput" accept="image/*">
         <button id="imageUploadBtn" class="btn">📁 이미지 불러오기</button>
@@ -258,8 +279,8 @@
         const imageInput = document.getElementById('imageInput');
 
         // 캔버스 사이즈 설정
-        board.width = window.innerWidth;
-        board.height = window.innerHeight;
+        board.width = board.clientWidth;
+        board.height = board.clientHeight; 
         overlay.width = 320;
         overlay.height = 240;
 
@@ -281,8 +302,38 @@
         clearBoardCanvas();
 
         function clearBoardCanvas() {
-            ctx.fillStyle = '#ffffff';
+
+            // 짙은 녹색 칠판 배경
+            const gradient = ctx.createLinearGradient(
+                0, 0, board.width, board.height
+            );
+
+            gradient.addColorStop(0, '#1c573d');
+            gradient.addColorStop(0.5, '#174b35');
+            gradient.addColorStop(1, '#123d2b');
+
+            ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, board.width, board.height);
+
+            // 은은한 분필 흔적
+            ctx.save();
+            ctx.globalAlpha = 0.035;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i < 35; i++) {
+                const x = Math.random() * board.width;
+                const y = Math.random() * board.height;
+
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + 30, y + 2);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            // 기존 배경 이미지 기능 유지
             if (bgImage) {
                 drawBackgroundImage();
             }
@@ -304,8 +355,9 @@
 
         function redrawBoard() {
             clearBoardCanvas();
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 5;
+
+            ctx.strokeStyle = '#fff9e8';
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
@@ -487,8 +539,8 @@
                         smoothedX = (alpha * screenX) + ((1 - alpha) * smoothedX);
                         smoothedY = (alpha * screenY) + ((1 - alpha) * smoothedY);
 
-                        ctx.strokeStyle = '#000000';
-                        ctx.lineWidth = 5;
+                        ctx.strokeStyle = '#fff9e8';
+                        ctx.lineWidth = 4;
                         ctx.lineCap = 'round';
                         ctx.lineJoin = 'round';
                         
@@ -522,8 +574,8 @@
 
         // 창 크기 변경 대응
         window.addEventListener('resize', () => {
-            board.width = window.innerWidth;
-            board.height = window.innerHeight;
+            board.width = board.clientWidth;
+            board.height = board.clientHeight;
             redrawBoard();
         });
     </script>
